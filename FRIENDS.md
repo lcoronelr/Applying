@@ -10,7 +10,7 @@ Works on Macs with Apple chips (M1 or newer — Apple menu → About This Mac �
 
 ## 1. Install
 
-1. Download **Apply.dmg** from **<https://github.com/lcoronelr/Applying/releases/latest>**, open it, and drag
+1. **[Download Apply.dmg](https://github.com/lcoronelr/Applying/releases/latest/download/Apply.dmg)**, open it, and drag
    **Apply** into **Applications**.
 2. Open **Apply** from Applications. macOS will say it *"can't be verified"* — that's because the app isn't from the
    App Store, not because anything is wrong. Click **Done**.

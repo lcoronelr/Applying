@@ -8,8 +8,8 @@ the form, click the site's **Submit** button, and the next job opens on its own.
 
 ## Download
 
-**[⬇ Download Apply for Mac](https://github.com/lcoronelr/Applying/releases/latest)** — open the `.dmg`, drag Apply
-into Applications. Apple-chip Macs (M1 or newer).
+**[⬇ Download Apply.dmg](https://github.com/lcoronelr/Applying/releases/latest/download/Apply.dmg)** — open it, drag Apply
+into Applications. Apple-chip Macs (M1 or newer). ([All releases](https://github.com/lcoronelr/Applying/releases))
 
 First launch: macOS says the app *"can't be verified"* (it isn't from the App Store). Open
 **System Settings → Privacy & Security** and click **Open Anyway**. Step-by-step guide: **[FRIENDS.md](FRIENDS.md)**.
