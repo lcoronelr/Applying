@@ -1,0 +1,25 @@
+# installed packages (recreated by setup.command)
+.venv/
+app/node_modules/
+# caches / temp
+__pycache__/
+.pytest_cache/
+.DS_Store
+~$*
+.~*
+# browser data and friends' personal profiles
+.browser-profile/
+simplify_ext/
+profiles/
+.cache/
+/build/
+# personal data — lives in ~/Library/Application Support/Apply/Data, never in the repo
+profile.json
+resume.pdf
+*.xlsx
+cover_letters/
+cover_letter_ins/
+submitted/
+screenshots/
+letter_style.json
+cover_template.txt

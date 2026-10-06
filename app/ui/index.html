@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'">
+  <title>Apply</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="drag traffic"></div>
+    <button class="profile-btn" id="profileBtn" title="Switch profile">
+      <span class="avatar" id="avatar">··</span>
+      <span class="profile-text"><span id="profileName">Loading…</span><span class="sub">Switch profile</span></span>
+      <svg class="chev" viewBox="0 0 16 16"><path d="M5 6l3 3 3-3" /></svg>
+    </button>
+    <nav id="nav">
+      <a data-page="apply" class="active"><svg viewBox="0 0 20 20"><path d="M4 10h12M11 5l5 5-5 5"/></svg>Apply</a>
+      <a data-page="jobs"><svg viewBox="0 0 20 20"><rect x="3" y="6" width="14" height="10" rx="2"/><path d="M7 6V4.5A1.5 1.5 0 0 1 8.5 3h3A1.5 1.5 0 0 1 13 4.5V6"/></svg>Jobs<span class="count" id="jobsCount"></span></a>
+      <a data-page="answers"><svg viewBox="0 0 20 20"><path d="M4 4h12v9H8l-4 3z"/></svg>Answers<span class="count warn" id="answersCount"></span></a>
+      <a data-page="profile"><svg viewBox="0 0 20 20"><circle cx="10" cy="7" r="3"/><path d="M4 17c0-3.3 2.7-5 6-5s6 1.7 6 5"/></svg>Profile</a>
+      <a data-page="settings"><svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="2.5"/><path d="M10 2.5v2M10 15.5v2M2.5 10h2M15.5 10h2M4.7 4.7l1.4 1.4M13.9 13.9l1.4 1.4M4.7 15.3l1.4-1.4M13.9 6.1l1.4-1.4"/></svg>Settings</a>
+    </nav>
+    <div class="side-foot">
+      <div class="stat"><span id="statApplied">0</span><label>Applied</label></div>
+      <div class="stat"><span id="statQueue">0</span><label>To do</label></div>
+      <div class="ai-pill" id="aiPill" title="Claude helps with questions your answers don't cover">AI off</div>
+    </div>
+  </aside>
+
+  <main>
+    <!-- APPLY -->
+    <section class="page active" id="page-apply">
+      <header class="toolbar drag">
+        <div class="tb-title">
+          <div class="tb-company" id="curCompany">Pick a job to start</div>
+          <div class="tb-role" id="curRole">Your queue is on the left, best matches first.</div>
+        </div>
+        <div class="tb-actions no-drag">
+          <div class="segmented" id="modeSeg" title="Test fills the form but blocks sending. Live lets you submit.">
+            <button data-mode="test" class="on">Test</button><button data-mode="live">Live</button>
+          </div>
+          <button class="btn" id="refillBtn" disabled>Fill again</button>
+          <button class="btn" id="laterBtn" disabled>Later</button>
+          <button class="btn" id="skipBtn" disabled>Skip</button>
+          <button class="btn primary" id="nextBtn">Start</button>
+        </div>
+      </header>
+      <div class="apply-body">
+        <div class="queue-col">
+          <div class="queue-head">
+            <input class="search" id="queueSearch" placeholder="Search queue" spellcheck="false">
+            <div class="checks"><label class="check"><input type="checkbox" id="easyOnly" checked> Quick forms only</label>
+            <label class="check" title="Hides jobs scored under 35 — senior roles, no sponsorship, wrong field"><input type="checkbox" id="hidePoor" checked> Hide poor matches</label></div>
+          </div>
+          <div class="queue" id="queue"></div>
+        </div>
+        <div class="browser-col">
+          <div class="urlbar">
+            <button class="icon-btn" id="backBtn" title="Back"><svg viewBox="0 0 16 16"><path d="M10 3L5 8l5 5"/></svg></button>
+            <button class="icon-btn" id="reloadBtn" title="Reload"><svg viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.5-3.5M13 3v3h-3"/></svg></button>
+            <div class="url" id="url"><svg viewBox="0 0 16 16" class="lock"><rect x="4" y="7" width="8" height="6" rx="1"/><path d="M6 7V5.5a2 2 0 0 1 4 0V7"/></svg><span id="urlText">No page open</span></div>
+            <button class="icon-btn" id="externalBtn" title="Open in your browser"><svg viewBox="0 0 16 16"><path d="M9 3h4v4M13 3L7 9M11 9.5V13H3V5h3.5"/></svg></button>
+          </div>
+          <div class="view-slot" id="viewSlot">
+            <div class="empty" id="viewEmpty">
+              <div class="empty-icon"><svg viewBox="0 0 48 48"><rect x="6" y="9" width="36" height="30" rx="5"/><path d="M6 17h36M14 26h12M14 31h20"/></svg></div>
+              <h2>Ready when you are</h2>
+              <p>Press <b>Start</b>. Each application opens right here and fills itself in.<br>You check it, click the site's Submit button, and the next one opens.</p>
+            </div>
+          </div>
+          <div class="banner" id="banner" hidden></div>
+        </div>
+        <div class="inspector" id="inspector">
+          <div class="insp-head"><h3>This application</h3><span class="summary" id="summary"></span></div>
+          <div class="insp-body" id="inspBody"><p class="muted">Questions and what was filled in will show up here.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- JOBS -->
+    <section class="page" id="page-jobs">
+      <header class="toolbar drag">
+        <div class="tb-title"><div class="tb-company">Jobs</div><div class="tb-role" id="jobsSub"></div></div>
+        <div class="tb-actions no-drag">
+          <button class="btn" id="rankBtn" hidden>Score with Claude</button>
+          <button class="btn" id="matchBtn" title="Compare every job to your resume (free, runs on your Mac)">Find best matches</button>
+          <button class="btn" id="importBtn">Import links…</button>
+          <button class="btn primary" id="fetchBtn">Get new jobs</button>
+        </div>
+      </header>
+      <div class="filters">
+        <input class="search" id="jobSearch" placeholder="Search company or role" spellcheck="false">
+        <div class="segmented" id="statusSeg">
+          <button data-f="todo" class="on">To do</button><button data-f="applied">Applied</button><button data-f="skipped">Skipped</button><button data-f="all">All</button>
+        </div>
+        <select id="siteFilter"><option value="">All sites</option><option value="easy" selected>Quick forms (Greenhouse, Lever, Ashby)</option><option value="workday">Workday</option><option value="other">Other</option></select>
+        <select id="matchFilter"><option value="0">Any match</option><option value="50">Decent matches (50+)</option><option value="65">Good matches (65+)</option><option value="75">Great matches (75+)</option></select>
+      </div>
+      <div class="table-wrap"><table class="jobs">
+        <thead><tr><th class="num">Match</th><th>Company</th><th>Role</th><th>Location</th><th>Site</th><th>Posted</th><th>Status</th></tr></thead>
+        <tbody id="jobsBody"></tbody>
+      </table><div class="more" id="jobsMore"></div></div>
+    </section>
+
+    <!-- ANSWERS -->
+    <section class="page" id="page-answers">
+      <header class="toolbar drag">
+        <div class="tb-title"><div class="tb-company">Answers</div><div class="tb-role">When a question mentions these words, this answer goes in. First match wins.</div></div>
+        <div class="tb-actions no-drag"><button class="btn" id="addAnswerBtn">Add answer</button><button class="btn primary" id="saveAnswersBtn">Save</button></div>
+      </header>
+      <div class="scroll">
+        <div class="card" id="unansweredCard">
+          <h3>Needs your answer</h3>
+          <p class="muted">Required questions the app couldn't answer yet. Answer once and it's filled every time.</p>
+          <div id="unansweredList"></div>
+        </div>
+        <div class="card">
+          <h3>Your answers</h3>
+          <p class="muted">Separate alternatives with <code>|</code> — dropdowns pick whichever exists. <code>@resume</code> uploads your resume, <code>@cover_letter</code> your letter, <code>SKIP</code> leaves it blank.</p>
+          <table class="answers"><thead><tr><th>Question mentions</th><th>Answer</th><th>For</th><th></th></tr></thead><tbody id="answersBody"></tbody></table>
+        </div>
+      </div>
+    </section>
+
+    <!-- PROFILE -->
+    <section class="page" id="page-profile">
+      <header class="toolbar drag">
+        <div class="tb-title"><div class="tb-company" id="profileTitle">Profile</div><div class="tb-role">Used to fill every application and write your cover letters.</div></div>
+        <div class="tb-actions no-drag"><button class="btn primary" id="saveProfileBtn">Save</button></div>
+      </header>
+      <div class="scroll"><form id="profileForm" class="form" autocomplete="off"></form></div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section class="page" id="page-settings">
+      <header class="toolbar drag"><div class="tb-title"><div class="tb-company">Settings</div><div class="tb-role"></div></div></header>
+      <div class="scroll">
+        <div class="card">
+          <h3>Claude (optional)</h3>
+          <p class="muted">With an Anthropic API key, Claude drafts answers to questions you haven't answered (outlined in yellow for you to check), writes each cover letter from the job posting, and scores how well jobs match your resume. Questions about sponsorship, citizenship, EEO, salary and signatures are never answered by AI. API use is billed by Anthropic separately from a Claude subscription — roughly 2–5¢ per application.</p>
+          <div class="row"><label>API key</label><input type="password" id="apiKey" placeholder="sk-ant-…" spellcheck="false"></div>
+          <div class="row"><label>Model</label><select id="model">
+            <option value="claude-opus-5-5">Claude Opus 5.5 — best answers</option>
+            <option value="claude-sonnet-5-5">Claude Sonnet 5.5 — cheaper</option>
+            <option value="claude-haiku-4-5">Claude Haiku 4.5 — cheapest</option>
+          </select></div>
+          <div class="row end"><button class="btn primary" id="saveSettingsBtn">Save</button></div>
+        </div>
+        <div class="card">
+          <h3>Your files</h3>
+          <p class="muted">Job lists, answers, screenshots of every form, and cover letters are stored on this Mac, in the app's own folder (each friend under <code>profiles/</code>). Show in Finder opens it.</p>
+          <div class="row end"><button class="btn" id="openFolderBtn">Show in Finder</button></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- sheets (modals) -->
+  <div class="sheet-backdrop" id="sheetBackdrop" hidden>
+    <div class="sheet" id="sheet"></div>
+  </div>
+  <div class="toast" id="toast" hidden></div>
+  <div class="busy" id="busy" hidden><div class="spinner"></div><span id="busyText">Working…</span></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
