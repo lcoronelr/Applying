@@ -1,6 +1,8 @@
 """Form filler: finds every question on an application page, answers it from the Answers sheet,
 then re-checks the page and reports required questions that are still empty."""
+import os
 import re
+import sys
 from pathlib import Path
 from datetime import datetime
 
@@ -183,6 +185,33 @@ RESUME_ON_PAGE_JS = r"""() => [...document.querySelectorAll('body *')].some(e =>
   && /[\w()-]\.(pdf|docx?)\b/i.test(e.textContent) && !/cover/i.test(e.textContent))"""
 
 
+# While the app is filling, the form can't be sent: submit events, clicks on Submit/Apply buttons and Enter
+# are all stopped. Once filling is done the guard is off and only your own click on Submit sends it.
+GUARD_ON = r"""() => {
+  window.__applyFilling = true;
+  if (window.__applyGuard) return;
+  window.__applyGuard = true;
+  const stop = e => { if (window.__applyFilling) { e.preventDefault(); e.stopImmediatePropagation(); } };
+  window.addEventListener('submit', stop, true);
+  window.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target && e.target.tagName !== 'TEXTAREA') stop(e); }, true);
+  window.addEventListener('click', e => {
+    const b = e.target && e.target.closest && e.target.closest('button, input[type=submit], input[type=image]');
+    if (!b || b.matches('[aria-pressed], [role=option], [role=combobox]')) return;
+    const text = (b.innerText || b.value || '').trim();
+    if (b.matches('[type=submit], input[type=image]') || (b.tagName === 'BUTTON' && !b.getAttribute('type') && b.form)
+        || /^(submit|apply|send|finish|complete)\b/i.test(text)) stop(e);
+  }, true);
+}"""
+GUARD_OFF = "() => { window.__applyFilling = false; }"
+
+
+PROFILE = bool(os.environ.get("APPLY_PROFILE"))  # log how long each field takes
+
+
+class Stopped(Exception):
+    """You pressed Stop."""
+
+
 # ---------- answer lookup ----------
 
 def compile_answers(rows):
@@ -284,7 +313,7 @@ def fill_field(frame, f, answer, resume_path, cover_letter=None):
         pdf, text = made
         if t == "file":
             ctl("input[type=file]").first.set_input_files(str(pdf))
-            frame.page.wait_for_timeout(2000)
+            frame.page.wait_for_timeout(1000)
             return True
         if t in ("text", "textarea"):
             ctl("input:visible, textarea:visible").first.fill(text)
@@ -299,7 +328,7 @@ def fill_field(frame, f, answer, resume_path, cover_letter=None):
         if inp.evaluate("e => e.files && e.files.length > 0") or frame.evaluate(RESUME_ON_PAGE_JS):
             return True  # Simplify (or you) already attached one
         inp.set_input_files(resume_path)
-        frame.page.wait_for_timeout(2000)
+        frame.page.wait_for_timeout(1000)
         return True
     if t in ("text", "textarea"):
         if f.get("numeric") and not re.fullmatch(r"[\d.]+", first):
@@ -342,7 +371,9 @@ def fill_field(frame, f, answer, resume_path, cover_letter=None):
             return False
         idx = f["options"].index(choice)
         if t == "buttons":
-            ctl("button[aria-pressed]").nth(idx).click()
+            btn = ctl("button[aria-pressed]").nth(idx)
+            btn.evaluate("b => { if (!b.getAttribute('type')) b.type = 'button'; }")  # typeless = submit in a form
+            btn.click()
         else:
             inp = ctl("input[type=radio], input[type=checkbox]").nth(idx)
             try:
@@ -354,31 +385,71 @@ def fill_field(frame, f, answer, resume_path, cover_letter=None):
             return False
         ctl("input[type=checkbox]").first.check(force=True)
     elif t == "combobox":
-        el = ctl("[role=combobox], [aria-autocomplete=list]").first
-        el.click()
-        frame.page.wait_for_timeout(500)
-        if _pick_from_listbox(frame, answer, f["options"]):  # short static list (Yes/No, EEO, country)
-            return True
-        for alt in [a for a in answer.split("|") if a.strip()][:3]:  # searchable list (location, school)
-            el.fill("")
-            el.press_sequentially(alt, delay=30)
-            for _ in range(10):  # suggestions load from the network — give them up to 5s
-                frame.page.wait_for_timeout(500)
-                if _pick_from_listbox(frame, alt):
-                    return True
-        el.fill("")
-        frame.page.keyboard.press("Escape")
-        return False
+        return fill_dropdown(frame, f, [answer])
     return True
 
 
-def fill_page(page, answers, job, resume_path, passes=3, cover_letter=None, drafter=None):
+def fill_dropdown(frame, f, candidates):
+    """Custom dropdowns: open once and click a real option matching any saved answer.
+    A short list (Yes/No, visa type, EEO…) is never typed into — no match means it's left for you.
+    Only big searchable lists (country, school, location) get the answer typed to find a suggestion."""
+    el = frame.locator(f'[data-bot-for="{f["i"]}"]:is([role=combobox], [aria-autocomplete=list])').first
+    el.scroll_into_view_if_needed()
+    el.click(force=True)  # don't wait for the last dropdown's closing animation
+    opts = frame.locator("[role=option]:visible")
+    texts = []
+    for _ in range(8):  # options usually appear within ~100ms
+        frame.page.wait_for_timeout(60)
+        texts = [x.strip() for x in opts.all_inner_texts()]
+        if texts:
+            break
+    if texts:
+        f["options"] = texts[:500]
+    for answer in candidates:
+        choice = best_option(answer, texts)
+        if choice is not None:
+            opts.nth(texts.index(choice)).click(force=True)
+            return True
+    if texts and len(texts) <= 40:
+        frame.page.keyboard.press("Escape")
+        return False
+    for alt in [a for a in candidates[0].split("|") if a.strip()][:2]:
+        el.fill("")
+        el.press_sequentially(alt, delay=12)
+        for _ in range(8):  # suggestions load from the network
+            frame.page.wait_for_timeout(300)
+            if _pick_from_listbox(frame, alt):
+                return True
+    el.fill("")
+    frame.page.keyboard.press("Escape")
+    return False
+
+
+def fill_page(page, answers, job, resume_path, passes=3, cover_letter=None, drafter=None, stop=None):
     """Fill every frame, re-scanning so follow-up questions that appear get answered too.
-    drafter(field) -> answer or None: asked for required questions the Answers sheet doesn't cover (AI).
-    Returns one dict per question on the final page: question/type/required/options/status."""
+    drafter(field) -> answer or None: asked for required questions the Answers sheet doesn't cover.
+    stop() -> True to halt (raises Stopped). Returns one dict per question: question/type/required/options/status."""
+    page.set_default_timeout(4000)  # one stubborn field shouldn't stall the whole run
+    frames = list(page.frames)
+    for fr in frames:
+        try:
+            fr.evaluate(GUARD_ON)
+        except Exception:
+            pass
+    try:
+        return _fill_frames(page, frames, answers, job, resume_path, passes, cover_letter, drafter, stop)
+    finally:
+        for fr in frames:
+            try:
+                fr.evaluate(GUARD_OFF)
+            except Exception:
+                pass
+
+
+def _fill_frames(page, frames, answers, job, resume_path, passes, cover_letter, drafter, stop):
     report = []
-    page.set_default_timeout(8000)  # one stubborn field shouldn't stall the whole run
-    for frame in page.frames:
+    check = (lambda: None) if stop is None else (lambda: (_ for _ in ()).throw(Stopped()) if stop() else None)
+    for frame in frames:
         add_education = True
         tried, seen_options = {}, {}  # question -> status of our attempt / options it offered
         refilled = set()  # filled once but the page wiped it (re-render) → one more try
@@ -392,26 +463,34 @@ def fill_page(page, answers, job, resume_path, passes=3, cover_letter=None, draf
                 if not todo:
                     break
                 for f in todo:
+                    check()
                     found = find_answers(f["question"], answers, job, f["type"], f["occ"])
                     if f["type"] == "file" and found and found[0] in uploaded:
                         tried[key(f)] = "filled"
                         continue
+                    t0 = datetime.now()
                     tried[key(f)] = attempt(frame, f, found, resume_path, cover_letter)
+                    if PROFILE:
+                        print(f"[fill] {(datetime.now() - t0).total_seconds():5.1f}s {f['type']:9} "
+                              f"opts={len(f['options']):<4} {f['question'][:40]:40} {tried[key(f)]}", file=sys.stderr)
                     if f["type"] == "file" and tried[key(f)] == "filled":
                         uploaded.add(found[0])
                     seen_options[key(f)] = f["options"]
                 if add_education and has_second_education(answers) and frame.evaluate(ADD_EDUCATION_JS):
                     add_education = False  # second degree: click "Add another" once, next pass fills it
-                    page.wait_for_timeout(800)
+                    page.wait_for_timeout(600)
                     continue
-                page.wait_for_timeout(800)
+                page.wait_for_timeout(400)
             if drafter:
                 for f in number_repeats(frame.evaluate(SCAN_JS)):
                     if f["required"] and not f["filled"] and tried.get(key(f)) in (None, "no answer", "no matching option"):
+                        check()
                         answer = drafter(f)
                         if answer and attempt(frame, f, [answer], resume_path) == "filled":
                             tried[key(f)] = "ai-drafted"
             final = number_repeats(frame.evaluate(SCAN_JS))
+        except Stopped:
+            raise
         except Exception:
             continue  # detached / cross-origin frame
         for f in final:
@@ -454,6 +533,7 @@ ADD_EDUCATION_JS = r"""
     return false;
   });
   if (!btn) return false;
+  if (!btn.getAttribute('type')) btn.type = 'button';  // never let "Add another" double as Submit
   btn.click();
   return true;
 }
@@ -466,6 +546,12 @@ def attempt(frame, f, candidates, resume_path, cover_letter=None):
         return "no answer"
     if candidates[0] == "SKIP":
         return "skipped"
+    if f["type"] == "combobox":  # one open, every saved answer checked against the real options
+        usable = [c for c in candidates if c != "SKIP" and not c.startswith("@")]
+        try:
+            return "filled" if usable and fill_dropdown(frame, f, usable) else "no matching option"
+        except Exception as e:
+            return "error: " + str(e).splitlines()[0][:60]
     status = "no matching option"
     for answer in candidates:
         if answer == "SKIP":

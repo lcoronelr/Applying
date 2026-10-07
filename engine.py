@@ -132,10 +132,27 @@ class Engine:
         pid = profiles.save_profile(id, data, resume, template)
         return self.cmd_profile_activate(pid)
 
+    SOFTWARE = ("software", "ml")  # the roles this app shows: software engineering (incl. ML/AI engineering)
+
     def cmd_jobs_list(self):
         keep = ("ID", "Source", "Company", "Title", "Location", "Posted", "ATS", "Status", "Match", "Why", "URL",
                 "Notes", "Updated", "Salary")
-        return [{k: r.get(k) for k in keep} for r in bot.load_rows().values()]
+        out = []
+        for r in bot.load_rows().values():
+            if r["Status"] in ("new", "later", "test-filled") and matcher.family_of(r["Title"]) not in self.SOFTWARE:
+                continue  # software engineering only
+            out.append({k: r.get(k) for k in keep})
+        return out
+
+    def cmd_jobs_refresh(self, force=False):
+        """New software jobs from the GitHub new-grad lists, at most every 12 hours (or when forced)."""
+        stamp = bot.DATA / ".cache" / "last_refresh"
+        if not force and stamp.exists() and datetime.now().timestamp() - stamp.stat().st_mtime < 12 * 3600:
+            return {"added": 0, "skipped": True}
+        r = self.cmd_jobs_fetch()
+        stamp.parent.mkdir(parents=True, exist_ok=True)
+        stamp.write_text(datetime.now().isoformat())
+        return r
 
     def cmd_jobs_fetch(self, sources=("speedyapply", "applyguy", "newgrad")):
         before = len(bot.load_rows())
@@ -223,8 +240,23 @@ class Engine:
         bot.save_rows(rows)
         return {"scored": len(done)}
 
+    stop_flag = False
+
+    def cmd_apply_stop(self):
+        self.stop_flag, self.watch = True, None
+        return True
+
+    def cmd_apply_view(self, id):
+        """Open a job's page without filling anything (e.g. one you already applied to)."""
+        job = bot.load_rows()[id]
+        self.watch, self.job, self.to_learn = None, None, set()
+        self.set_test(True)  # look, don't send
+        self.view().goto(job["URL"], wait_until="domcontentloaded", timeout=45000)
+        return {"job": {k: job.get(k) for k in ("ID", "Company", "Title", "Status", "URL")}}
+
     def cmd_apply_open(self, id, test=True):
         """Open a job in the panel and fill everything we know."""
+        self.stop_flag = False
         if self.pid == "me" and self.profile.get("first_name") == "Setup" and not self.profile.get("email"):
             raise RuntimeError("Create your profile first (click the name at the top left → New profile).")
         rows = bot.load_rows()
@@ -238,10 +270,11 @@ class Engine:
             page.wait_for_selector("input[type=email], input[type=file], textarea", timeout=12000)
         except Exception:
             pass
-        page.wait_for_timeout(1500)
+        page.wait_for_timeout(800)
         return self._fill(rows, job)
 
     def cmd_apply_refill(self):
+        self.stop_flag = False
         if not self.job:
             raise RuntimeError("Open a job first.")
         rows = bot.load_rows()
@@ -282,9 +315,18 @@ class Engine:
 
         answers = filler.compile_answers(bot.load_answers())
         resume = str(bot.DATA / self.profile.get("resume_path", "resume.pdf"))
-        report = filler.fill_page(page, answers, job, resume, cover_letter=cover, drafter=drafter)
+        try:
+            if self.stop_flag:
+                raise filler.Stopped()
+            report = filler.fill_page(page, answers, job, resume, cover_letter=cover, drafter=drafter,
+                                      stop=lambda: self.stop_flag)
+        except filler.Stopped:
+            self.watch, self.to_learn = None, set()
+            return {"stopped": True, "job": {k: job.get(k) for k in ("ID", "Company", "Title", "Status", "URL")}}
         # questions you'll answer yourself: whatever you put in them is learned when you move on / submit
-        self.to_learn = {f["question"] for f in report if f["status"] not in ("filled", "already", "skipped")}
+        # everything shown as "needs you" (incl. required questions an answer said to SKIP) or suggested
+        self.to_learn = {f["question"] for f in report if f["status"] not in ("filled", "already", "skipped")
+                         or (f["status"] == "skipped" and f["required"])}
         bot.record_unanswered(report, job)
         filled = [f for f in report if f["status"] in ("filled", "already", "ai-drafted")]
         missing = [f for f in report if filler.is_missing(f)]
@@ -396,8 +438,14 @@ def main():
 
     def reader():
         for line in sys.stdin:
-            if line.strip():
-                inbox.put(json.loads(line))
+            if not line.strip():
+                continue
+            msg = json.loads(line)
+            if msg.get("cmd") == "apply.stop":  # handled right away, even in the middle of filling a form
+                eng.stop_flag, eng.watch = True, None
+                emit(id=msg["id"], ok=True, result=True)
+                continue
+            inbox.put(msg)
         inbox.put(None)
     threading.Thread(target=reader, daemon=True).start()
     event("ready", **eng.state())

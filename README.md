@@ -18,10 +18,11 @@ First launch: macOS says the app *"can't be verified"* (it isn't from the App St
 
 - **Fills applications** on Greenhouse, Lever and Ashby (and many others): text, dropdowns, checkboxes, date pickers,
   location search boxes, resume and cover-letter uploads.
-- **Finds jobs** — pulls new-grad software roles from public lists
+- **Finds jobs** — new-grad software engineering roles from public lists
   ([SimplifyJobs](https://github.com/SimplifyJobs/New-Grad-Positions),
   [speedyapply](https://github.com/speedyapply/2027-SWE-College-Jobs),
-  [ApplyGuy](https://github.com/ApplyGuy/2027-New-Grad-Jobs)), or import your own links / a CSV.
+  [ApplyGuy](https://github.com/ApplyGuy/2027-New-Grad-Jobs)), refreshed automatically.
+- **Never submits for you** — while it fills, the form can't be sent; you review and click Submit. **Stop** any time.
 - **Matches jobs to your resume** — free and offline: every job gets a 0–100 score and a reason
   (*"Python, AWS · new grad"*, *"needs 3+ yrs"*). Senior roles, and roles that won't sponsor a visa when you need one,
   go to the bottom.

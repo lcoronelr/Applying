@@ -662,3 +662,48 @@ def test_similar_question_reuses_your_answer_as_a_suggestion():
     no_such_option = {"question": "Are you able to work in-person at least 3 days a week from one of our offices?",
                       "type": "select", "options": ["Remote only", "Hybrid"]}
     assert learn.similar_answer(no_such_option, rows) is None  # never invents a choice
+
+
+# ---------- never submits, never types into short dropdowns ----------
+
+def test_filling_can_never_submit_the_form(tmp_path):
+    """A Yes/No 'button' with no type (= submit in a form) and an Enter key press must not send the form."""
+    from playwright.sync_api import sync_playwright
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.set_content('<form onsubmit="window.sent = (window.sent || 0) + 1; return false">'
+                         '<div><label>Are you legally authorized to work in the US? *</label>'
+                         '<button aria-pressed="false" onclick="this.setAttribute(\'aria-pressed\',\'true\')">Yes</button>'
+                         '<button aria-pressed="false">No</button></div>'
+                         '<label for="fn">First Name</label><input id="fn"></form>')
+        filler.fill_page(page, ANSWERS, JOB, str(tmp_path / "r.pdf"))
+        pressed = page.evaluate("[...document.querySelectorAll('button[aria-pressed=true]')].map(b => b.innerText)")
+        sent_while_filling = page.evaluate("window.sent || 0")
+        page.press("#fn", "Enter")  # after filling, the guard is off: you can submit yourself
+        sent_by_you = page.evaluate("window.sent || 0")
+        browser.close()
+    assert pressed == ["Yes"] and sent_while_filling == 0 and sent_by_you == 1
+
+
+def test_short_dropdown_is_clicked_never_typed(tmp_path):
+    from playwright.sync_api import sync_playwright
+    html = """<form><div><label for="v">Which visa do you hold? *</label>
+      <input id="v" role="combobox" aria-autocomplete="list" required oninput="window.typed = this.value"
+        onclick="document.querySelector('#lb').hidden = false"></div>
+      <ul id="lb" role="listbox" hidden>%s</ul></form>"""
+    opts = "".join(f'<li role="option" onclick="document.querySelector(\'#v\').value = this.innerText;'
+                   f'document.querySelector(\'#lb\').hidden = true">{o}</li>' for o in ["F-1", "H-1B", "Green card", "None"])
+    rows = [("which visa", "Yes", "choice"), ("which visa", "J-1|F-1", "choice")]  # 2nd saved answer fits
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.set_content(html % opts)
+        filler.fill_page(page, filler.compile_answers(rows), JOB, str(tmp_path / "r.pdf"))
+        got, typed = page.input_value("#v"), page.evaluate("window.typed || ''")
+        page.set_content(html % opts)
+        filler.fill_page(page, filler.compile_answers(rows[:1]), JOB, str(tmp_path / "r.pdf"))  # nothing fits
+        got2, typed2 = page.input_value("#v"), page.evaluate("window.typed || ''")
+        browser.close()
+    assert got == "F-1" and typed == ""
+    assert got2 == "" and typed2 == ""  # left for you, nothing typed

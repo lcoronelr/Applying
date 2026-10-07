@@ -47,38 +47,24 @@ The first time you open Apply it takes you straight to **New profile**.
 Each person gets their own folder (`profiles/your-name/`) with their own resume, answers, job list and letters —
 several friends can share one computer without mixing anything up. Switch people from the name at the top left.
 
-## 3. Get jobs to apply to
+## 3. Apply
 
-On the **Jobs** page:
+Everything happens on the **Jobs** screen:
 
-- **Get new jobs** — pulls new-grad software jobs from three public lists (SimplifyJobs, speedyapply, ApplyGuy).
-- **Import links…** — paste application links, one per line, or choose a **CSV** file with a `url` column
-  (optional columns: `company`, `title`, `location`). Titles and companies are looked up for you.
+- **Your job list** (left) — new-grad software engineering jobs, updated by themselves from public GitHub lists
+  (SimplifyJobs, speedyapply, ApplyGuy) and **matched to your resume**: best fits first, with a score. Senior roles and
+  roles that won't sponsor a visa (if you need one) are hidden while *Good matches* is on. **Search** at the top.
+- **Start** (or click any job) — the application opens in the middle and fills itself in. Short dropdowns are picked
+  from their real options; nothing is ever typed into them.
+- **Test / Live** (top right): **Test** fills everything but nothing can be sent (uploads look empty) — try it first.
+  **Live** is for real: fix anything in **red**, check it, and click the site's **Submit** button.
+  The app **never submits for you** — while it's filling, the form can't be sent at all.
+- After you submit, it says *"Applied ✓ — next job in 3…"* — click **Stay here** to cancel.
+- **Stop** halts filling right away. **Skip** hides a job. **Applied** / **Skipped** tabs show your history;
+  opening a job you already applied to only shows the posting.
+- The right side shows only what **needs you**; everything filled is folded under *Filled*.
 
-Every job is **matched to your resume** automatically (free, on your Mac): a score from 0–100 and a short reason
-like *"Python, AWS · new grad"* or *"needs 3+ yrs"*. Jobs that need years of experience, are senior, or say they
-won't sponsor visas (if you need sponsorship) go to the bottom. **Find best matches** re-scores everything —
-use it after updating your resume. The **Match** filter shows only good fits.
-
-Click any job to open it. The **Quick forms** filter (Greenhouse, Lever, Ashby) shows the sites that fill best;
-Workday sites usually make you create an account first, so expect to do more by hand there.
-
-## 4. Apply
-
-Go to **Apply** and press **Start**. Your queue is on the left, best matches first
-(*Hide poor matches* keeps senior / no-sponsorship / off-field jobs out of the way).
-
-- **Test / Live** switch (top right):
-  - **Test** — fills the form but **nothing can be sent**. File uploads (resume, letter) look empty in Test mode
-    because uploading is blocked too. Start here to see how it works.
-  - **Live** — real mode. Fix anything outlined in **red**, look it over, then click **Submit** on the website.
-    The app notices the "thank you" page, marks the job **applied**, saves a screenshot of what you sent
-    (in `submitted/`), and opens the next job.
-- **Skip** (not for me) · **Later** (come back to it) · **Fill again** (if the page changed, e.g. after clicking
-  the site's *Apply* button) · **Next job**.
-- The right side lists every question: green = filled, red = needs you.
-
-## 5. It learns your answers
+## 4. It learns your answers
 
 When a question has no saved answer it's outlined in **red** — just answer it on the page like normal.
 When you submit (or move to another job), whatever you entered is **saved and filled automatically next time**
