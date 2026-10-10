@@ -286,6 +286,9 @@ def fetch(args):
         if j["Sponsorship"] in ("U.S. Citizenship is Required", "Does Not Offer Sponsorship") \
                 or BLOCKED_TITLE.search(j["Title"]):
             continue
+        if not j["Company"] or re.fullmatch(r"[0-9a-f-]{20,}", j["Company"], re.I):  # some lists give an ID, not a name
+            import profiles
+            j["Company"] = profiles._company_from_url(j["URL"])
         rows[j["ID"]] = dict(j, ATS=detect_ats(j["URL"]), Status="new", Updated="", Notes="")
         known_urls.add(job_id(j["URL"]))
         added += 1
