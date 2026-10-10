@@ -24,6 +24,7 @@
   <img src="https://img.shields.io/badge/platform-macOS%20(Apple%20silicon)-lightgrey" alt="Platform: macOS">
   <img src="https://img.shields.io/badge/python-3.11-3776ab" alt="Python 3.11">
   <img src="https://img.shields.io/badge/electron-44-47848f" alt="Electron 44">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT License"></a>
 </p>
 
 <p align="center">
@@ -197,6 +198,10 @@ so the same form-filling code runs from the app and from the command line.
 Apply is a personal productivity tool. It is not affiliated with any employer, job board or applicant tracking
 system. Review every application before you submit it, make sure every answer is accurate, and follow the terms of
 the sites you apply through.
+
+## License
+
+Released under the [MIT License](LICENSE).
 
 ## Author
 
